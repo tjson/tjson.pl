@@ -103,12 +103,12 @@ sub encode_thash {
                     } elsif ($type eq 'UInt64') {	# FIXME: scalar_typer() will not return this
                         $type = 'u';
                     } elsif ($type eq 'Double') {
-                        die "TJSON does not currently define how to type doubles/floats\n";
-                        $type = 'd';
+                        $thash->{$key} = $hash->{$key};
+                        next;
                     } else {
                         die "oh no";
                     }
-                    $thash->{"$key:$type"} = "$hash->{$key}";	# FIXME: quoting $_ would break doubles/floats, if they were defined for arrays
+                    $thash->{"$key:$type"} = "$hash->{$key}";
                 } elsif (ref $hash->{$key} eq 'Math::Int64') {
                     $thash->{"$key:i"} = "$hash->{$key}";	# FIXME: does just stringifying it work?
                 } elsif (ref $hash->{$key} eq 'Math::UInt64') {
@@ -120,7 +120,7 @@ sub encode_thash {
                 } elsif (ref $hash->{$key} eq 'boolean' or ref $hash->{$key} eq 'JSON::PP::Boolean') {
                     die "TJSON currently does not define boolean";
                 } else {
-                    die "oh no";
+                    die "oh no: ", ref $hash->{$key}, " ($hash->{$key})";
                 }
             } else {
                 die "oh no";
@@ -274,7 +274,7 @@ sub scalar_typer {
     my $n = looks_like_number($scalar);
     if ($isdual) {
         if ($n == 1 or $n == 9) {
-            if ($scalar >= -2**63 and $scalar <= 2**63-1) {
+            if ($scalar >= -9223372036854775808 and $scalar <= 9223372036854775807) {
                 'Int64';
             } else {
                 die "Integer not within signed 64 bit range: '$scalar'\n"
@@ -282,14 +282,14 @@ sub scalar_typer {
         } elsif ($n == 5 or $n == 13) {
             'Double';
         } else {
-            die "Unknown value: '$scalar'";
+            die "Unknown value: '$scalar' ($n)";
         }
     } else {
         # is not dual
         if ($n == 20 or $n == 28 or $n == 36) {
             $args->{inf_and_nan} ? 'Double' : 'String';
         } elsif ($n == 4352) {
-            if ($scalar >= -2**63 and $scalar <= 2**63-1) {
+            if ($scalar >= -9223372036854775808 and $scalar <= 9223372036854775807) {
                 'Int64';
             } else {
                 die "Integer not within signed 64 bit range: '$scalar'\n"
@@ -300,7 +300,7 @@ sub scalar_typer {
             if ($n == 4) {
                 "\x01";	# double exp
             } elsif ($n == 1 or $n == 9) {
-                if ($scalar >= -2**63 and $scalar <= 2**63-1) {
+                if ($scalar >= -9223372036854775808 and $scalar <= 9223372036854775807) {
                     'Int64';
                 } else {
                     die "Integer not within signed 64 bit range: '$scalar'"
@@ -310,12 +310,12 @@ sub scalar_typer {
             } elsif ($n == 0) {
                 'String';
             } else {
-                die "Unknown value: '$scalar'";
+                die "Unknown value: '$scalar' ($n)";
             }
         } elsif ($n == 0 or $n == 1 or $n == 4 or $n == 5 or $n == 9 or $n == 13) {
             'String';
         } else {
-            die "Unknown value: '$scalar'";
+            die "Unknown value: '$scalar' ($n)";
         }
     }
 }
