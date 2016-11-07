@@ -1,6 +1,9 @@
 #!/usr/bin/env perl
 
-use Test::More tests => 40;
+use 5.12.0;
+use warnings;
+
+use Test::More tests => 51;
 use Test::Deep qw/ cmp_deeply /;
 
 use TJSON;
@@ -46,11 +49,26 @@ undef $@; eval { decode_tjson '{"example:b64":"This is not a valid base64url str
 undef $@; eval { decode_tjson '{"oversize:i":"9223372036854775808"}' }; like $@, qr/^Math::Int64 overflow: Number is out of bounds for int64_t conversion/, 'Oversized Signed Integer Test';
 undef $@; eval { decode_tjson '{"undersize:i":"-9223372036854775809"}' }; like $@, qr/^Math::Int64 overflow: Number is out of bounds for int64_t conversion/, 'Undersized Signed Integer Test';
 undef $@; eval { decode_tjson '{"invalid:i":"This is not a valid integer"}' }; is $@, "TJSON expected a Int64 but got: 'String'\n", 'Invalid Signed Integer';
-undef $@; eval { decode_tjson '{"oversized:u":"18446744073709551616"}' }; is $@, "TJSON expected a UInt64 but got: '18446744073709551616'\n", 'Oversized Unsigned Integer Test"';
+undef $@; eval { decode_tjson '{"oversized:u":"18446744073709551616"}' }; is $@, "TJSON expected a UInt64 but got: '18446744073709551616'\n", 'Oversized Unsigned Integer Test';
 undef $@; eval { decode_tjson '{"negative:u":"-1"}' }; is $@, "TJSON expected a UInt64 but got: '-1'\n", 'Negative Unsigned Integer Test';
 undef $@; eval { decode_tjson '{"invalid:u":"This is not a valid integer"}' }; is $@, "TJSON expected a UInt64 but got: 'This is not a valid integer'\n", 'Invalid Unsigned Integer';
 undef $@; eval { decode_tjson '{"invalid:t":"2016-10-02T07:31:51-08:00"}' }; is $@, "TJSON expected a RFC3339 timestamp with the upper-case UTC time zone identifier 'Z'\n", 'Timestamp With Invalid Time Zone';
 undef $@; eval { decode_tjson '{"invalid:t":"This is not a valid timestamp"}' }; is $@, "TJSON expected a RFC3339 timestamp with the upper-case UTC time zone identifier 'Z'\n", 'Invalid Timestamp';
+
+is encode_tjson({}), '{}', 'Empty Object';
+is encode_tjson({ example => 'foobar' }), '{"example:s":"foobar"}', 'Object with UTF-8 String Key';
+is encode_tjson({ example => [ int64(1), int64(2), int64(3) ] }), '{"example:A<i>":["1","2","3"]}', 'Array of integers';
+is encode_tjson({ example => [ { a => int64(1) }, { b => int64(2) } ] }), '{"example:A<O>":[{"a:i":"1"},{"b:i":"2"}]}', 'Array of objects';
+is encode_tjson({ example => [ [ int64(1), int64(2) ], [ int64(3), int64(4) ], [ int64(5), int64(6) ] ] }), '{"example:A<A<i>>":[["1","2"],["3","4"],["5","6"]]}', 'Multidimensional array of integers';
+#is encode_tjson({ example => 'Hello, world!' }), '{"example:b16":"48656c6c6f2c20776f726c6421"}', 'Base16 Binary Data';
+#is encode_tjson({ example => 'Hello, world!' }), '{"example:b32":"jbswy3dpfqqho33snrscc"}', 'Base32 Binary Data';
+#is encode_tjson({ example => 'Hello, world!' }), '{"example:b64":"SGVsbG8sIHdvcmxkIQ"}', 'Base64url Binary Data';
+is encode_tjson({ example => int64(42) }), '{"example:i":"42"}', 'Signed Integer';
+is encode_tjson({ min => int64('-9223372036854775808') }), '{"min:i":"-9223372036854775808"}', 'Signed Integer Mininum Test';
+is encode_tjson({ max => int64('9223372036854775807') }), '{"max:i":"9223372036854775807"}', 'Signed Integer Maximum Test';
+is encode_tjson({ example => uint64(42) }), '{"example:u":"42"}', 'Unsigned Integer';
+is encode_tjson({ maxint => uint64('18446744073709551615') }), '{"maxint:u":"18446744073709551615"}', 'Unsigned Integer Range Test';
+is encode_tjson({ example => DateTime::Format::RFC3339->new->parse_datetime('2016-10-02T07:31:51Z') }), '{"example:t":"2016-10-02T07:31:51Z"}', 'Timestamp';
 
 __END__
 

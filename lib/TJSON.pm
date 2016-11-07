@@ -14,7 +14,7 @@ use MIME::Base64 qw/ encode_base64url decode_base64url /;
 use Scalar::Util qw/ isdual looks_like_number /;
 use Time::Moment;
 
-@TJSON::EXPORT = qw/ decode_tjson /;	# encode_tjson
+@TJSON::EXPORT = qw/ decode_tjson encode_tjson /;
 
 my @modules = qw/ Cpanel::JSON::XS JSON::PP /;
 
@@ -60,11 +60,149 @@ sub decode_tjson {
     decode_thash($MODULE->new->utf8->allow_nonref->disallow_dupkeys->decode($json));
 }
 
+sub encode {
+    encode_tjson($_[1]);
+}
+
+sub encode_tjson {
+    my ($hash) = @_;
+    $MODULE->new->utf8->encode(encode_thash($hash));
+}
+
+sub encode_thash {
+    my ($hash, $coerce) = @_;
+    $coerce //= 1;	# FIXME
+    my $thash = {};
+    if (ref $hash eq 'HASH') {
+        for my $key (keys %$hash) {
+            if (ref $hash->{$key} eq 'TJSON::Object') {
+            } elsif (ref $hash->{$key} eq 'TJSON::Array') {
+            } elsif (ref $hash->{$key} eq 'TJSON::String') {
+            } elsif (ref $hash->{$key} eq 'TJSON::Int64') {
+            } elsif (ref $hash->{$key} eq 'TJSON::UInt64') {
+            } elsif (ref $hash->{$key} eq 'TJSON::Base16') {
+            } elsif (ref $hash->{$key} eq 'TJSON::Base32') {
+            } elsif (ref $hash->{$key} eq 'TJSON::Base64url') {
+            } elsif (ref $hash->{$key} eq 'TJSON::Timestamp') {
+            } elsif (ref $hash->{$key} eq 'TJSON::Double') {	# NOTE: spec just saying "floating points"
+            } elsif (ref $hash->{$key} eq 'TJSON::Boolean') {	# NOTE: not in spec
+            } elsif (ref $hash->{$key} eq 'TJSON::Null') {	# NOTE: not in spec
+            } elsif ($coerce) {
+                if (ref $hash->{$key} eq 'HASH') {
+                    $thash->{"$key:O"} = encode_thash($hash->{$key});
+                } elsif (ref $hash->{$key} eq 'ARRAY') {
+                    my ($tag, $tarray) = encode_tarray($hash->{$key});
+                    $thash->{"$key:$tag"} = $tarray;
+                } elsif (ref $hash->{$key} eq '') {	# string, number, undef (null not in spec), other? (should fail if other)
+                    my $type = scalar_typer($hash->{$key}, {coerce_num => 0});
+                    if ($type eq 'String') {
+                        $type = 's';
+                        # FIXME: if not all Unicode strings, they need to be BaseXX-encoded
+                    } elsif ($type eq 'Int64') {
+                        $type = 'i';
+                    } elsif ($type eq 'UInt64') {	# FIXME: scalar_typer() will not return this
+                        $type = 'u';
+                    } elsif ($type eq 'Double') {
+                        die "TJSON does not currently define how to type doubles/floats\n";
+                        $type = 'd';
+                    } else {
+                        die "oh no";
+                    }
+                    $thash->{"$key:$type"} = "$hash->{$key}";	# FIXME: quoting $_ would break doubles/floats, if they were defined for arrays
+                } elsif (ref $hash->{$key} eq 'Math::Int64') {
+                    $thash->{"$key:i"} = "$hash->{$key}";	# FIXME: does just stringifying it work?
+                } elsif (ref $hash->{$key} eq 'Math::UInt64') {
+                    $thash->{"$key:u"} = "$hash->{$key}";	# FIXME: does just stringifying it work?
+                } elsif (ref $hash->{$key} eq 'DateTime') {
+                   $thash->{"$key:t"} = DateTime::Format::RFC3339->new->format_datetime($hash->{$key});	# FIXME: TJSON only allows a subset of RFC 3339
+                } elsif (ref $hash->{$key} eq 'Time::Moment') {
+                   $thash->{"$key:t"} = DateTime::Format::RFC3339->new->format_datetime($hash->{$key});	# FIXME: TJSON only allows a subset of RFC 3339
+                } elsif (ref $hash->{$key} eq 'boolean' or ref $hash->{$key} eq 'JSON::PP::Boolean') {
+                    die "TJSON currently does not define boolean";
+                } else {
+                    die "oh no";
+                }
+            } else {
+                die "oh no";
+            }
+        }
+    } else {
+        die "TJSON allows only object as the top-level element\n";
+    }
+    $thash;
+}
+
+sub encode_tarray {
+    my ($array) = @_;
+    my %refs = map { ref $_ => undef } @$array;
+    die "TJSON cannot coerce type of an empty array\n" unless keys %refs;
+    die "TJSON does not allow arrays of mixed types\n" unless keys %refs == 1;
+    my ($ref) = keys %refs;
+    my $tarray = [];
+    my $tag;
+    if ($ref eq 'HASH') {
+        $tag = 'A<O>';
+        @$tarray = map { encode_thash($_) } @$array;
+    } elsif ($ref eq 'ARRAY') {
+        my %tags;
+        for my $v (@$array) {
+            my ($tag, $subtarray) = encode_tarray($v);
+            $tags{$tag} = undef;
+            die "TJSON does not allow arrays of mixed types\n" unless keys %tags == 1;
+            push @$tarray, $subtarray;
+        }
+        my ($subtag) = keys %tags;
+        $tag = "A<$subtag>";
+    } elsif ($ref eq '') {	# string, number, undef (null not in spec), other? (should fail if other)
+        my %types;
+        for my $v (@$array) {
+            my $type = scalar_typer($v, {coerce_num => 0});
+            $types{$type} = undef;
+            die "TJSON does not allow arrays of mixed types\n" unless keys %types == 1;
+        }
+        my ($type) = keys %types;
+        if ($type eq 'String') {
+            $type = 's';
+            # FIXME: if not all Unicode strings, they need to be BaseXX-encoded
+        } elsif ($type eq 'Int64') {
+            $type = 'i';
+        } elsif ($type eq 'UInt64') {	# FIXME: scalar_typer() will not return this
+            $type = 'u';
+        } elsif ($type eq 'Double') {
+            die "TJSON does not currently define how to type doubles/floats\n";
+            $type = 'd';
+        } else {
+            die "oh no";
+        }
+        $tag = "A<$type>";
+        @$tarray = map { "$_" } @$array;	# FIXME: quoting $_ would break doubles/floats, if they were defined for arrays
+    } elsif ($ref eq 'Math::Int64') {
+        $tag = 'A<i>';
+        @$tarray = map { "$_" } @$array;	# FIXME: does just stringifying it work?
+    } elsif ($ref eq 'Math::UInt64') {
+        $tag = 'A<u>';
+        @$tarray = map { "$_" } @$array;	# FIXME: does just stringifying it work?
+    } elsif ($ref eq 'DateTime') {
+        $tag = 'A<t>';
+        @$tarray = map { DateTime::Format::RFC3339->new->format_datetime($_) } @$array;	# FIXME: TJSON only allows a subset of RFC 3339
+    } elsif ($ref eq 'Time::Moment') {
+        $tag = 'A<t>';
+        @$tarray = map { DateTime::Format::RFC3339->new->format_datetime($_) } @$array;	# FIXME: TJSON only allows a subset of RFC 3339
+    } elsif ($ref eq 'boolean' or $ref eq 'JSON::PP::Boolean') {
+        die "TJSON currently does not define boolean";
+        $tag = 'A<B>';				# NOTE: I made up 'B'
+        @$tarray = map { $_ ? 'true' : 'false' } @$array;
+    } else {
+        die "oh no";
+    }
+    $tag, $tarray;
+}
+
 sub decode_thash {
     my ($data) = @_;
     my $hash = {};
     if (ref $data eq 'HASH') {
-        for my $tagged (keys $data) {
+        for my $tagged (keys %$data) {
             my $sep = rindex $tagged, ':';
             die "TJSON requires all keys be tagged\n" if $sep == -1;
             my $key = substr $tagged, 0, $sep;
@@ -126,9 +264,10 @@ sub decode_value {
 }
 
 # \x01 \x02 \x0A \x10 \x12
+# Int64 Double String
 sub scalar_typer {
     my ($scalar, $args) = @_;
-    $args->{coerce_num} = 1;
+    $args->{coerce_num} //= 1;
     die "No value passed to scalar_typer" unless defined $scalar;
     die "Not a scalar: $scalar" if ref $scalar;
     my $isdual = isdual($scalar);
