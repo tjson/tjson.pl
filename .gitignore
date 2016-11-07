@@ -1,3 +1,5 @@
 *~
 /.build/
 /ignore/
+/tjson-spec/
+/tjson.rb
