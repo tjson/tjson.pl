@@ -222,6 +222,7 @@ sub decode_value {
     my ($value, $type) = @_;
     if ("$type" eq 'Array') {
         die "TJSON expected an Array but got: '$value'" unless ref $value eq 'ARRAY';
+        die "TJSON requires type parameter for non-empty arrays\n" if "$type->{subtype}" eq 'Empty' and @$value;
         for my $e (@$value) {
             $e = decode_value($e, $type->{subtype});
         }
@@ -324,7 +325,9 @@ sub scalar_typer {
 # undefined tags but valid: decimal numbers, true, false, null
 sub parse_tag {
     my ($tag) = @_;
-    if ($tag eq 'O') {	# Object
+    if (!$tag) {				# only for an empty Array
+        TJSON::Type->new('Empty');
+    } elsif ($tag eq 'O') {			# Object
         TJSON::Type->new('Object');
     } elsif ($tag =~ /^[a-z][a-z0-9]*$/) {	# Scalar
         if ($tag eq 's') {
@@ -344,8 +347,8 @@ sub parse_tag {
         } else {
             die "Unsupported tag: '$tag'\n";
         }
-    } elsif ($tag =~ /^[A-Z][a-z0-9]*<.+>$/) {	# Type Expression
-        if ($tag =~ /^A<(.+)>$/) {
+    } elsif ($tag =~ /^[A-Z][a-z0-9]*<.*>$/) {	# Type Expression
+        if ($tag =~ /^A<(.*)>$/) {
             my $subtag = $1;
             #bless { type => 'Array', subtype => parse_tag($subtag) }, 'TJSON::Type';
             #bless { subtype => parse_tag($subtag) }, 'TJSON::Type::Array';

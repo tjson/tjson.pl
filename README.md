@@ -2,8 +2,7 @@ A Perl parser for TJSON: https://www.tjson.org
 
 NOTE: The TJSON spec is a DRAFT: This format is still in a draft state and subject to change!
 
-This parser should be compliant as of this commit of the spec:
-https://github.com/tjson/tjson-spec/tree/3a93f0b5146db97243535c7a2f9340eb1de16b88
+This parser should be compliant as of Revision: 20 of [draft-tjson-examples.txt](https://github.com/tjson/tjson-spec/blob/7f22407949badd13ef918acc3cc3132e1131875a/draft-tjson-examples.txt)
 
 NOTE: This module requires unmerged changes to either Cpanel::JSON::XS or JSON::PP
 

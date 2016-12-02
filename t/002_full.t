@@ -3,7 +3,7 @@
 use 5.12.0;
 use warnings;
 
-use Test::More tests => 58;
+use Test::More tests => 60;
 use Test::Deep qw/ cmp_deeply /;
 
 use TJSON;
@@ -18,6 +18,7 @@ cmp_deeply decode_tjson('{}'), {}, 'Empty Object';
 cmp_deeply decode_tjson('{"example:s":"foobar"}'), {example => 'foobar'}, 'Object with UTF-8 String Key';
 cmp_deeply decode_tjson('{"example:A<i>": ["1", "2", "3"]}'), { example => [ int64(1), int64(2), int64(3) ] }, 'Array of integers';
 cmp_deeply decode_tjson('{"example:A<O>": [{"a:i": "1"}, {"b:i": "2"}]}'), { example => [ { a => int64(1) }, { b => int64(2) } ] }, 'Array of objects';
+cmp_deeply decode_tjson('{"example:A<>": []}'), { example => [] }, 'Empty array';
 cmp_deeply decode_tjson('{"example:A<A<i>>": [["1", "2"], ["3", "4"], ["5", "6"]]}'), { example => [ [ int64(1), int64(2) ], [ int64(3), int64(4) ], [ int64(5), int64(6) ] ] }, 'Multidimensional array of integers';
 cmp_deeply decode_tjson('{"example:b16":"48656c6c6f2c20776f726c6421"}'), { example => 'Hello, world!' }, 'Base16 Binary Data';
 cmp_deeply decode_tjson('{"example:b32":"jbswy3dpfqqho33snrscc"}'), { example => 'Hello, world!' }, 'Base32 Binary Data';
@@ -39,6 +40,7 @@ undef $@; eval { decode_tjson '{"example:":"foobar"}' }; is $@, "TJSON requires 
 undef $@; eval { decode_tjson '{"example:i":"1","example:i":"2"}' }; like $@, qr/^Duplicate keys not allowed,/, 'Invalid Object with Repeated Member Names';
 undef $@; eval { decode_tjson '{"example:i":"1","example:i":"1"}' }; like $@, qr/^Duplicate keys not allowed,/, 'Invalid Object with Repeated Member Names and Values';
 undef $@; eval { decode_tjson '{"example:i":"1","example:u":"2"}' }; is $@, "TJSON requires names to be distinct\n", 'Invalid Object with Repeated Member Names but Distinct Tags (CUSTOM)';
+undef $@; eval { decode_tjson '{"example:A<>": ["1", "2", "3"]}' }; is $@, "TJSON requires type parameter for non-empty arrays\n", 'Array with missing type parameter';
 undef $@; eval { decode_tjson '{"example:b16":"48656C6C6F2C20776F726C6421"}' }; is $@, "TJSON Base16 values must be all lowercase\n", 'Invalid Base16 Binary Data with bad case';
 undef $@; eval { decode_tjson '{"example:b16":"This is not a valid hexadecimal string"}' }; is $@, "TJSON Base16 values must be all lowercase\n", 'Invalid Base16 Binary Data';
 undef $@; eval { decode_tjson '{"example:b32":"JBSWY3DPFQQHO33SNRSCC"}' }; is $@, "TJSON Base32 values must be all lowercase\n", 'Invalid Base32 Binary Data with bad case';
