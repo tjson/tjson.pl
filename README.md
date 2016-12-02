@@ -7,7 +7,7 @@ https://github.com/tjson/tjson-spec/tree/3a93f0b5146db97243535c7a2f9340eb1de16b8
 
 NOTE: This module requires unmerged changes to either Cpanel::JSON::XS or JSON::PP
 
-There are pull requests at https://github.com/rurban/Cpanel-JSON-XS/pull/75 and https://github.com/makamaka/JSON-PP/pull/30
+There are pull requests at https://github.com/rurban/Cpanel-JSON-XS/pull/75 (in discussion) and https://github.com/makamaka/JSON-PP/pull/30 (declined)
 
 My forks are at https://github.com/rabcyr/Cpanel-JSON-XS and https://github.com/rabcyr/JSON-PP
 
